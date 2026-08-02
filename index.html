@@ -66,6 +66,17 @@
   .sub-h h3 { font-size:13px; font-weight:600; margin:0; color:var(--cc,var(--muted));
               letter-spacing:.01em; white-space:nowrap; }
   .sub-h .scnt { color:var(--muted); font-size:11px; }
+  .subnav { display:none; gap:7px; align-items:center; padding:8px 0 2px; margin-top:8px;
+            border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  .subnav::-webkit-scrollbar { display:none; }
+  .subnav.show { display:flex; }
+  .subchip { border:1px solid var(--line); background:var(--chipbg); border-radius:999px;
+             padding:5px 12px; font-size:12.5px; cursor:pointer; color:var(--ink); white-space:nowrap;
+             flex-shrink:0; transition:border-color .15s, background .15s; }
+  .subchip:hover { border-color:var(--cc,#a8a29e); }
+  .subchip.active { background:var(--cc,var(--ink)); border-color:var(--cc,var(--ink)); color:#fff; }
+  .subchip .n { color:var(--muted); font-size:10.5px; margin-left:4px; }
+  .subchip.active .n { color:rgba(255,255,255,.85); }
   .grid { column-width:300px; column-gap:16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden;
           display:inline-block; width:100%; margin:0 0 16px; break-inside:avoid;
@@ -127,6 +138,7 @@
     <a class="chip" id="chip-all" data-cat="all"><b>📚 全部</b></a>
     <a class="chip" data-cat="Design Ideas" style="--cc:#8b5cf6"><b>🎨 Design Ideas</b><span class="n">160</span></a><a class="chip" data-cat="AI" style="--cc:#f59e0b"><b>🤖 AI</b><span class="n">128</span></a><a class="chip" data-cat="Travel" style="--cc:#ec4899"><b>✈️ Travel</b><span class="n">33</span></a><a class="chip" data-cat="Self-Care" style="--cc:#10b981"><b>🌿 Self-Care</b><span class="n">32</span></a><a class="chip" data-cat="Things" style="--cc:#64748b"><b>🛍️ Things</b><span class="n">28</span></a><a class="chip" data-cat="Work ethic" style="--cc:#3b82f6"><b>💼 Work ethic</b><span class="n">25</span></a><a class="chip" data-cat="Tidying" style="--cc:#a16207"><b>🧹 Tidying</b><span class="n">18</span></a><a class="chip" data-cat="Food" style="--cc:#f43f5e"><b>🍰 Food</b><span class="n">17</span></a><a class="chip" data-cat="Videos" style="--cc:#ef4444"><b>🎬 Videos</b><span class="n">13</span></a><a class="chip" data-cat="Game" style="--cc:#22c55e"><b>🎮 Game</b><span class="n">8</span></a><a class="chip" data-cat="Bible" style="--cc:#6366f1"><b>✝️ Bible</b><span class="n">4</span></a><a class="chip" data-cat="Watch Together" style="--cc:#a855f7"><b>📺 Watch Together</b><span class="n">2</span></a><a class="chip" data-cat="Milton" style="--cc:#a855f7"><b>💜 Milton</b><span class="n">1</span></a><a class="chip" data-cat="Study" style="--cc:#0891b2"><b>📖 Study</b><span class="n">1</span></a>
   </div>
+  <div class="subnav" id="subnav"></div>
 </header>
 <div id="sections"></div>
 <button id="toTop" title="回到頂端">↑</button>
@@ -139,9 +151,22 @@ const RECENT_N = 12;
 
 let sortDir = localStorage.getItem('galSort') || 'new';
 let activeCat = localStorage.getItem('galCat') || 'all';
+let activeSub = 'all';
 const secRoot = document.getElementById('sections');
 const sortBtn = document.getElementById('sortBtn');
 const qInput = document.getElementById('q');
+const subnav = document.getElementById('subnav');
+
+// Ordered sub-category list per category (only cats that have sub-tags).
+const SUBCATS = {};
+for (const e of DATA) {
+  if (!e.s) continue;
+  (SUBCATS[e.c] = SUBCATS[e.c] || {});
+  SUBCATS[e.c][e.s] = (SUBCATS[e.c][e.s] || 0) + 1;
+}
+function subAnchorId(cat, sub){
+  return 'sub-' + (cat + '-' + sub).replace(/[^a-zA-Z0-9一-鿿]+/g, '-');
+}
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,
   m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -153,7 +178,7 @@ function cardHtml(e){
   const search = escapeHtml(((e.t||'') + ' ' + (e.c||'')).toLowerCase());
   const meta = CAT_META[e.c] || ['📌','#78716c'];
   return `
-    <div class="card" data-title="${search}" style="--cc:${meta[1]}">
+    <div class="card" data-title="${search}" data-sub="${escapeHtml(e.s || '')}" style="--cc:${meta[1]}">
       <div class="card-h"><div class="t">${escapeHtml(e.t)}</div>
         <a href="${e.u}" target="_blank" rel="noopener">開啟 ↗</a></div>
       ${frame}
@@ -214,10 +239,13 @@ function buildSection(id, icon, name, color, items){
       const g = groups[key];
       const sh = document.createElement('div');
       sh.className = 'sub-h';
+      sh.dataset.sub = key;
+      sh.id = subAnchorId(name, key);
       sh.innerHTML = `<h3>${escapeHtml(key)}</h3><span class="scnt">${g.length}</span><span class="sh-line"></span>`;
       sec.appendChild(sh);
       const grid = document.createElement('div');
       grid.className = 'grid';
+      grid.dataset.sub = key;
       grid.innerHTML = g.map(cardHtml).join('');
       sec.appendChild(grid);
     }
@@ -253,8 +281,15 @@ function attachObserver(){
 function applyFilter(){
   const q = qInput.value.trim().toLowerCase();
   const searching = q.length > 0;
-  document.querySelectorAll('.card').forEach(c =>
-    c.classList.toggle('hidden', searching && !c.dataset.title.includes(q)));
+  const subFilter = !searching && activeCat !== 'all' && activeSub !== 'all';
+  document.querySelectorAll('.card').forEach(c => {
+    let hide = searching && !c.dataset.title.includes(q);
+    if (subFilter) hide = hide || c.dataset.sub !== activeSub;
+    c.classList.toggle('hidden', hide);
+  });
+  // Sub-group headings/grids: hide those not matching the active sub-filter.
+  document.querySelectorAll('.sub-h, .grid[data-sub]').forEach(el =>
+    el.classList.toggle('hidden', subFilter && el.dataset.sub !== activeSub));
   document.querySelectorAll('#sections > section').forEach(s => {
     const cat = s.dataset.cat;
     if (searching) {
@@ -267,11 +302,45 @@ function applyFilter(){
   });
 }
 
+function buildSubnav(){
+  const subs = (activeCat !== 'all' && SUBCATS[activeCat]) ? SUBCATS[activeCat] : null;
+  if (!subs) { subnav.classList.remove('show'); subnav.innerHTML = ''; return; }
+  const meta = CAT_META[activeCat] || ['📌','#78716c'];
+  subnav.style.setProperty('--cc', meta[1]);
+  const total = Object.values(subs).reduce((a,b)=>a+b,0);
+  let html = `<span class="subchip${activeSub==='all'?' active':''}" data-sub="all">全部<span class="n">${total}</span></span>`;
+  for (const k of Object.keys(subs)) {
+    html += `<span class="subchip${activeSub===k?' active':''}" data-sub="${escapeHtml(k)}">${escapeHtml(k)}<span class="n">${subs[k]}</span></span>`;
+  }
+  subnav.innerHTML = html;
+  subnav.classList.add('show');
+  subnav.querySelectorAll('.subchip').forEach(ch =>
+    ch.addEventListener('click', () => setSub(ch.dataset.sub)));
+}
+
+function setSub(sub){
+  activeSub = sub;
+  subnav.querySelectorAll('.subchip').forEach(ch =>
+    ch.classList.toggle('active', ch.dataset.sub === sub));
+  applyFilter();
+  if (sub !== 'all') {
+    const anchor = document.getElementById(subAnchorId(activeCat, sub));
+    if (anchor) {
+      const y = anchor.getBoundingClientRect().top + scrollY - 120;
+      scrollTo({ top: y, behavior: 'smooth' });
+    }
+  } else {
+    window.scrollTo({ top: 0 });
+  }
+}
+
 function setCat(cat){
   activeCat = cat;
+  activeSub = 'all';
   localStorage.setItem('galCat', cat);
   document.querySelectorAll('.chip[data-cat]').forEach(ch =>
     ch.classList.toggle('active', ch.dataset.cat === cat));
+  buildSubnav();
   applyFilter();
   window.scrollTo({ top: 0 });
 }
@@ -286,6 +355,7 @@ function render(){
     buildSection('cat-' + cat.replace(/\s+/g,'-'), meta[0], cat, meta[1], items);
   }
   sortBtn.textContent = sortDir === 'new' ? '📅 日期：新 → 舊' : '📅 日期：舊 → 新';
+  buildSubnav();
   applyFilter();
   attachObserver();
 }
