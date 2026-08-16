@@ -151,24 +151,26 @@
   footer { padding:26px 22px 46px; color:var(--muted); font-size:12px; line-height:1.6; }
   .hidden { display:none !important; }
   @media (max-width:600px) {
-    header { padding:9px 12px 7px calc(12px + env(safe-area-inset-left)); }
-    section { padding:6px 12px 4px; }
+    header { padding:14px 15px 12px calc(15px + env(safe-area-inset-left)); }
+    section { padding:8px 15px 6px; }
     h1 { font-size:16px; }
     .head-sub { display:none; }
     /* Row 1: title + count. Row 2: search + icon buttons. Nothing wraps. */
-    .head-row { flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-    .head-tools { width:100%; margin-left:0; gap:6px; }
+    .head-row { flex-wrap:wrap; gap:10px; margin-bottom:13px; }
+    .head-tools { width:100%; margin-left:0; gap:9px; }
     .searchwrap { flex:1; min-width:0; }
-    #q, #q:focus { width:100%; font-size:16px; padding:8px 30px 8px 32px; }  /* 16px stops iOS zoom-on-focus */
-    .tbtn { padding:8px 11px; font-size:15px; }
+    #q, #q:focus { width:100%; font-size:16px; padding:10px 32px 10px 34px; }  /* 16px stops iOS zoom-on-focus */
+    .tbtn { padding:10px 13px; font-size:15px; }
     .lbl { display:none; }              /* icon-only tool buttons on phones */
     .nav, .rangenav { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
-                      -webkit-overflow-scrolling:touch; padding-bottom:2px; }
-    .nav::after, .rangenav::after { content:''; flex:0 0 8px; }   /* scroll-end breathing room */
-    .rangenav { margin:7px 0 1px; }
+                      -webkit-overflow-scrolling:touch; padding-bottom:3px; gap:9px; }
+    .nav::after, .rangenav::after { content:''; flex:0 0 10px; }   /* scroll-end breathing room */
+    .rangenav { margin:0 0 12px; }
     .rangenav .head-sub { display:none; }
-    .chip { padding:7px 12px; }
-    .sec-h { margin:16px 0 10px; }
+    .rbtn { padding:7px 13px; }
+    .chip { padding:9px 14px; }
+    .subnav { margin-top:12px; padding:11px 0 3px; gap:9px; }
+    .sec-h { margin:20px 0 13px; }
     .grid { column-width:auto; column-count:1; }   /* one clean column, full-width cards */
     .card-h .t { font-size:14px; -webkit-line-clamp:3; }
     .frame iframe { height:520px; }
