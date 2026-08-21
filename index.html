@@ -56,6 +56,25 @@
   .chip b { font-weight:600; }
   .chip .n { color:var(--muted); font-size:11px; }
   .chip.active .n { color:rgba(255,255,255,.8); }
+  /* 入口頁：分類磚 */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(168px,1fr)); gap:13px;
+           padding:16px 22px 10px; }
+  .tile { position:relative; border:1px solid var(--line); border-radius:16px; padding:15px 15px 13px;
+          background:linear-gradient(150deg, color-mix(in srgb, var(--cc,#8b5cf6) 26%, var(--card)) 0%,
+                                             var(--card) 72%);
+          box-shadow:var(--shadow); cursor:pointer; text-align:left; color:var(--ink);
+          border-top:3px solid var(--cc,var(--line)); font:inherit;
+          transition:transform .12s, box-shadow .2s, border-color .15s; }
+  .tile:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+  .tile .em { font-size:23px; line-height:1; display:block; margin-bottom:7px;
+              filter:drop-shadow(0 2px 5px rgba(0,0,0,.14)); }
+  .tile .nm { font-size:14px; font-weight:700; letter-spacing:-.01em; display:block; }
+  .tile .n { font-size:11.5px; color:var(--muted); margin-top:3px; display:block; }
+  .tiles-h { display:flex; align-items:center; gap:9px; padding:16px 22px 0; }
+  .tiles-h h2 { font-size:16.5px; margin:0; letter-spacing:-.01em; }
+  .tiles-h .cnt { color:var(--muted); font-size:12px; background:var(--chipbg); border:1px solid var(--line);
+                  border-radius:999px; padding:2px 9px; }
+  #backBtn.rbtn { font-weight:600; }
   section { padding:10px 22px 6px; }
   .sec-h { display:flex; align-items:center; gap:9px; margin:20px 0 13px; }
   .sec-h .dot { width:11px; height:11px; border-radius:50%; box-shadow:0 0 0 4px color-mix(in srgb, currentColor 15%, transparent); }
@@ -171,6 +190,9 @@
     .chip { padding:9px 14px; }
     .subnav { margin-top:12px; padding:11px 0 3px; gap:9px; }
     .sec-h { margin:20px 0 13px; }
+    .tiles { grid-template-columns:repeat(2, 1fr); gap:11px; padding:13px 15px 8px; }
+    .tile { padding:13px 12px 11px; }
+    .tiles-h { padding:14px 15px 0; }
     .grid { column-width:auto; column-count:1; }   /* one clean column, full-width cards */
     .card-h .t { font-size:14px; -webkit-line-clamp:3; }
     .frame iframe { height:520px; }
@@ -202,6 +224,7 @@
     </div>
   </div>
   <div class="rangenav" id="rangenav">
+    <button class="rbtn hidden" id="backBtn">← 全部分類</button>
     <button class="rbtn" data-range="all">全部</button>
     <button class="rbtn" data-range="30">最近 30 日</button>
     <button class="rbtn" data-range="90">3 個月</button>
@@ -214,6 +237,8 @@
   </div>
   <div class="subnav" id="subnav"></div>
 </header>
+<div class="tiles-h hidden" id="tilesH"><h2>🗂️ 分類</h2><span class="cnt" id="tilesCnt"></span></div>
+<div class="tiles hidden" id="tiles"></div>
 <div id="sections"></div>
 <button id="toTop" title="回到頂端">↑</button>
 <footer>資料來自 Notion「Threads 收藏清單 - Real」。卡片為 Threads / Instagram / YouTube 官方嵌入，捲動到時即時載入原帖圖片；若某帖顯示不出來，點「開啟 ↗」看原文。</footer>
@@ -314,6 +339,24 @@ function buildRecent(){
   secRoot.appendChild(sec);
 }
 
+// 入口頁的分類磚：主頁只顯示「最新加入」＋分類磚，撳一下先進入該分類。
+function buildTiles(){
+  const wrap = document.getElementById('tiles');
+  const counts = {};
+  for (const e of DATA) counts[e.c] = (counts[e.c] || 0) + 1;
+  wrap.innerHTML = CATS.map(cat => {
+    const meta = CAT_META[cat] || ['📌','#78716c'];
+    return `<button class="tile" data-cat="${escapeHtml(cat)}" style="--cc:${meta[1]}">
+      <span class="em">${meta[0]}</span>
+      <span class="nm">${escapeHtml(cat)}</span>
+      <span class="n">${counts[cat] || 0} 項</span>
+    </button>`;
+  }).join('');
+  wrap.querySelectorAll('.tile').forEach(t =>
+    t.addEventListener('click', () => setCat(t.dataset.cat)));
+  document.getElementById('tilesCnt').textContent = CATS.length + ' 個分類 · ' + DATA.length + ' 個靈感';
+}
+
 function buildSection(id, icon, name, color, items){
   const sec = document.createElement('section');
   sec.id = id;
@@ -406,12 +449,18 @@ function applyFilter(){
     const head = g.previousElementSibling;
     if (head && head.classList.contains('sub-h')) head.classList.toggle('hidden', off);
   });
+  // Home = 全部 + 冇搜尋 + 冇日期篩選 → 只顯示最新加入同分類磚，唔render成頁卡片。
+  const homeMode = !searching && !cutoff && activeCat === 'all';
+  document.getElementById('tiles').classList.toggle('hidden', !homeMode);
+  document.getElementById('tilesH').classList.toggle('hidden', !homeMode);
+  document.getElementById('backBtn').classList.toggle('hidden', activeCat === 'all');
   document.querySelectorAll('#sections > section').forEach(s => {
     const cat = s.dataset.cat;
     if (cat === '__recent__') {
       s.classList.toggle('hidden', searching || !!cutoff);
       return;
     }
+    if (homeMode) { s.classList.add('hidden'); return; }
     if (searching || cutoff) {
       const catOk = searching || activeCat === 'all' || activeCat === cat;
       s.classList.toggle('hidden', !catOk || !s.querySelector('.card:not(.hidden)'));
@@ -467,6 +516,7 @@ function setCat(cat){
 function render(){
   secRoot.innerHTML = '';
   buildRecent();
+  buildTiles();
   for (const cat of CATS) {
     const items = sortItems(DATA.filter(e => e.c === cat));
     if (!items.length) continue;
@@ -503,8 +553,9 @@ function setRange(r){
   attachObserver();
   window.scrollTo({ top: 0 });
 }
-document.querySelectorAll('.rbtn').forEach(b =>
+document.querySelectorAll('.rbtn[data-range]').forEach(b =>
   b.addEventListener('click', () => setRange(b.dataset.range)));
+document.getElementById('backBtn').addEventListener('click', () => setCat('all'));
 
 // 🎲 隨機靈感 — jump to a random currently-visible card
 document.getElementById('randBtn').addEventListener('click', () => {
