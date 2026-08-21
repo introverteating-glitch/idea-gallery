@@ -457,7 +457,8 @@ function applyFilter(){
   document.querySelectorAll('#sections > section').forEach(s => {
     const cat = s.dataset.cat;
     if (cat === '__recent__') {
-      s.classList.toggle('hidden', searching || !!cutoff);
+      // 最新加入 belongs to the home view only.
+      s.classList.toggle('hidden', searching || !!cutoff || activeCat !== 'all');
       return;
     }
     if (homeMode) { s.classList.add('hidden'); return; }
