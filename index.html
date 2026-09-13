@@ -466,22 +466,47 @@ function buildSection(id, icon, name, color, items){
 
 // Threads / Instagram embeds post their real content height; resize the iframe to
 // match so long posts aren't clipped into a nested scrollbar inside the card.
+// Some embeds report late (after images load) or use an unexpected message shape,
+// so: scan the whole message for a plausible height, keep applying every update,
+// and nudge each iframe to re-measure for the first ~30s after it loads.
+function deepHeight(o, depth){
+  if (depth > 4 || o == null) return 0;
+  if (typeof o === 'number') return 0;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch { return 0; } }
+  if (typeof o !== 'object') return 0;
+  for (const k of ['height','offsetHeight','scrollHeight','contentHeight']) {
+    const v = Number(o[k]);
+    if (isFinite(v) && v > 100) return v;
+  }
+  for (const k in o) { const v = deepHeight(o[k], depth + 1); if (v) return v; }
+  return 0;
+}
 window.addEventListener('message', ev => {
   let host = '';
   try { host = new URL(ev.origin).hostname; } catch { return; }
-  if (!/(^|\.)(threads|instagram)\.(com|net)$/.test(host)) return;
-  let d = ev.data;
-  if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
-  if (!d || typeof d !== 'object') return;
-  const h = Number(d.height ?? d.details?.height ?? d.payload?.height);
-  if (!isFinite(h) || h < 120) return;
+  if (!/(^|\.)(threads|instagram|cdninstagram)\.(com|net)$/.test(host)) return;
+  const h = deepHeight(ev.data, 0);
+  if (!h) return;
   for (const f of document.querySelectorAll('.frame iframe')) {
     if (f.contentWindow === ev.source) {
-      f.style.height = Math.min(Math.round(h), 1600) + 'px';
+      const px = Math.max(200, Math.round(h));
+      if (Math.abs(parseFloat(f.style.height) - px) > 2) f.style.height = px + 'px';
+      f.dataset.sized = '1';
+      f.setAttribute('scrolling', 'no');
       break;
     }
   }
 });
+
+// Ask an embed to re-measure. Instagram/Threads embed scripts answer a MEASURE ping.
+function nudgeMeasure(f){
+  const msg = JSON.stringify({ type: 'MEASURE' });
+  let n = 0;
+  const t = setInterval(() => {
+    if (!f.isConnected || n++ > 15) { clearInterval(t); return; }
+    try { f.contentWindow && f.contentWindow.postMessage(msg, '*'); } catch {}
+  }, 2000);
+}
 
 let io = null;
 function attachObserver(){
@@ -495,6 +520,7 @@ function attachObserver(){
         f.loading = 'lazy';
         f.src = el.dataset.src;
         f.setAttribute('allowfullscreen','');
+        f.addEventListener('load', () => nudgeMeasure(f));
         el.appendChild(f);
       }
       io.unobserve(el);
